@@ -1,2 +1,5 @@
 [phases.setup]
-nixPkgs = ["python313", "gcc", "libffi"]
+nixPkgs = ["python313", "gcc", "libffi", "libsodium"]
+
+[phases.build]
+cmds = ["pip install --upgrade pip", "pip install --no-cache-dir -r requirements.txt"]
