@@ -1,4 +1,5 @@
 import os
+import random
 import discord
 from discord.ext import commands
 
@@ -7,8 +8,9 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Hafıza tabanlı ekonomi sözlüğü
+# Hafıza tabanlı ekonomi ve süre takip sözlükleri
 bakiye_sistemi = {} 
+gunluk_cooldown = {}
 
 # Senin Admin ID'n
 ADMIN_ID = 991497628921634927
@@ -32,10 +34,7 @@ async def id(ctx, user_id: int):
         kullanici = await bot.fetch_user(user_id)
         kurulus_tarihi = kullanici.created_at.strftime("%d.%m.%Y %H:%M:%S")
         
-        embed = discord.Embed(
-            title="🔍 Kullanıcı Bilgi Sistemi",
-            color=discord.Color.blue()
-        )
+        embed = discord.Embed(title="🔍 Kullanıcı Bilgi Sistemi", color=discord.Color.blue())
         embed.set_thumbnail(url=kullanici.avatar.url if kullanici.avatar else kullanici.default_avatar.url)
         embed.add_field(name="Kullanıcı Adı", value=f"{kullanici} (`{kullanici.id}`)", inline=False)
         embed.add_field(name="Discord'a Başlama Tarihi", value=kurulus_tarihi, inline=False)
@@ -60,7 +59,7 @@ async def sil(ctx, miktar: int):
         bilgi = await ctx.send(f"🧹 Başarıyla **{len(silinen) - 1}** adet mesaj silindi kanka!")
         await bilgi.delete(delay=3)
     except Exception as e:
-        await ctx.send(f"❌ Hata oluştu (14 günden eski mesajlar silinemez): `{e}`")
+        await ctx.send(f"❌ Hata oluştu: `{e}`")
 
 @bot.command()
 async def kayit(ctx):
@@ -69,7 +68,7 @@ async def kayit(ctx):
         await ctx.send(f"⚠️ {ctx.author.mention}, zaten sistemde bir hesabın var kanka!")
     else:
         bakiye_sistemi[user_id] = {"para": 500, "isim": ctx.author.name}
-        await ctx.send(f"🎉 Kayıt başarılı {ctx.author.mention}! Hesabına **500 Para** yüklendi. `!cuzdan` yazarak bakiyeni görebilirsin.")
+        await ctx.send(f"🎉 Kayıt başarılı {ctx.author.mention}! Hesabına başlangıç hediyesi **500 Para** yüklendi. `!cuzdan` yazarak bakiyeni görebilirsin.")
 
 @bot.command(aliases=["cuzdan", "bakiye"])
 async def profil(ctx):
@@ -104,10 +103,98 @@ async def gonder(ctx, miktar: int, hedef: discord.Member):
     bakiye_sistemi[target_id]["para"] += miktar
     await ctx.send(f"✅ Başarıyla {hedef.mention} kişisine **{miktar} Para** gönderdin kanka!")
 
+# ================= 🎮 OWO TARZI OYUN SİSTEMLERİ ================= #
+
+@bot.command()
+async def gunluk(ctx):
+    user_id = str(ctx.author.id)
+    if user_id not in bakiye_sistemi:
+        await ctx.send("❌ Önce `!kayit` olmalısın kanka!")
+        return
+    
+    # Basit bir günlük ödül simülasyonu (Herkes alabilir)
+    odul = 1000
+    bakiye_sistemi[user_id]["para"] += odul
+    await ctx.send(f"🎁 Günlük ödülün toplandı {ctx.author.mention}! Cüzdanına **{odul} Para** eklendi.")
+
+@bot.command()
+async def yazitura(ctx, miktar: int, secim: str):
+    user_id = str(ctx.author.id)
+    if user_id not in bakiye_sistemi:
+        await ctx.send("❌ Önce `!kayit` olmalısın kanka!")
+        return
+    
+    secim = secim.lower()
+    if secim not in ["yazi", "tura"]:
+        await ctx.send("⚠️ Seçimini `yazi` veya `tura` olarak yapmalısın kanka!")
+        return
+    
+    if miktar <= 0 or bakiye_sistemi[user_id]["para"] < miktar:
+        await ctx.send("❌ Geçersiz miktar veya yetersiz bakiye!")
+        return
+
+    sonuc = random.choice(["yazi", "tura"])
+    
+    if secim == sonuc:
+        bakiye_sistemi[user_id]["para"] += miktar
+        await ctx.send(f"🎉 Para **{sonuc.upper()}** geldi! Kazandın ve cüzdanına **+{miktar} Para** eklendi kanka!")
+    else:
+        bakiye_sistemi[user_id]["para"] -= miktar
+        await ctx.send(f"😢 Para **{sonuc.upper()}** geldi, kaybettin! Cüzdanından **-{miktar} Para** gitti.")
+
+@bot.command()
+async def avlan(ctx):
+    user_id = str(ctx.author.id)
+    if user_id not in bakiye_sistemi:
+        await ctx.send("❌ Önce `!kayit` olmalısın kanka!")
+        return
+    
+    bulunan_para = random.randint(50, 300)
+    bakiye_sistemi[user_id]["para"] += bulunan_para
+    
+    canavarlar = ["Vahşi Ejderha 🐉", "Zombi 🧟", "Uzaylı 👽", "Kocaayak 🦍"]
+    av = random.choice(canavarlar)
+    
+    await ctx.send(f"🏹 Ormanda **{av}** ile karşılaştın ve yendin! Ödül olarak cüzdanına **+{bulunan_para} Para** düştü kanka!")
+
+@bot.command()
+async def slots(ctx, miktar: int):
+    user_id = str(ctx.author.id)
+    if user_id not in bakiye_sistemi:
+        await ctx.send("❌ Önce `!kayit` olmalısın kanka!")
+        return
+    
+    if miktar <= 0 or bakiye_sistemi[user_id]["para"] < miktar:
+        await ctx.send("❌ Geçersiz miktar veya yetersiz bakiye!")
+        return
+
+    semboller = ["🍒", "🍋", "🍊", "🍇", "💎", " 7️⃣ "]
+    sonuc1 = random.choice(semboller)
+    sonuc2 = random.choice(semboller)
+    sonuc3 = random.choice(semboller)
+
+    slot_goruntu = f"[ {sonuc1} | {sonuc2} | {sonuc3} ]"
+
+    if sonuc1 == sonuc2 == sonuc3:
+        kazanc = miktar * 5
+        bakiye_sistemi[user_id]["para"] += kazanc
+        await ctx.send(f"🎰 **SLOTS** 🎰\n{slot_goruntu}\n\n🔥 MÜKEMMEL! Üçlü tutturdun ve **+{kazanc} Para** kazandın kanka!")
+    elif sonuc1 == sonuc2 or sonuc2 == sonuc3 or sonuc1 == sonuc3:
+        kazanc = miktar * 2
+        bakiye_sistemi[user_id]["para"] += kazanc
+        await ctx.send(f"🎰 **SLOTS** 🎰\n{slot_goruntu}\n\n✨ İkili tutturdun! Cüzdanına **+{kazanc} Para** eklendi kanka.")
+    else:
+        bakiye_sistemi[user_id]["para"] -= miktar
+        await ctx.send(f"🎰 **SLOTS** 🎰\n{slot_goruntu}\n\n❌ Maalesef eşleşmedi, **-{miktar} Para** kaybettin kanka.")
+
+# ================= ==============================================
+
+# ================= 👑 SADECE SANA ÖZEL YÖNETİCİ PANELİ ================= #
+
 @bot.command()
 async def adminpanel(ctx):
     if ctx.author.id != ADMIN_ID:
-        await ctx.send("🚨 Burası sadece kurucuya (Serhat'a) özel kanka! 😎")
+        await ctx.send("🚨 Burası sadece kurucuya (Serhat'a) özel kanka, yetkin yok! 😎")
         return
 
     embed = discord.Embed(title="⚙️ SİSTEM YÖNETİCİ PANELİ", color=discord.Color.red())
@@ -142,5 +229,7 @@ async def admin_istatistik(ctx):
     embed.add_field(name="Kayıtlı Oyuncu", value=toplam_oyuncu, inline=True)
     embed.add_field(name="Toplam Servet", value=toplam_servet, inline=True)
     await ctx.send(embed=embed)
+
+# ======================================================================
 
 bot.run(os.getenv("DISCORD_TOKEN"))
