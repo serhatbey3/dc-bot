@@ -15,4 +15,9 @@ async def on_ready():
 async def selam(ctx):
     await ctx.send(f"Aleykümselam {ctx.author.mention}! 🚀")
 
+@bot.command()
+async def ping(ctx):
+    latency = round(bot.latency * 1000)
+    await ctx.send(f"Pong! 🏓 Gecikme süresi: **{latency}ms**")
+
 bot.run(os.getenv("DISCORD_TOKEN"))
