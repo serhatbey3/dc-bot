@@ -19,6 +19,22 @@ ADMIN_ID = 991497628921634927
 async def on_ready():
     print(f"{bot.user.name} olarak giriş yapıldı! Bot aktif.")
 
+@bot.command(name="gir")
+async def ses_gir(ctx):
+    kanal_id = 1543494597647409202
+    kanal = bot.get_channel(kanal_id)
+    
+    if not kanal or not isinstance(kanal, discord.VoiceChannel):
+        await ctx.send("❌ Belirtilen ID'ye sahip bir ses kanalı bulunamadı kanka!")
+        return
+    
+    if ctx.voice_client:
+        await ctx.voice_client.move_to(kanal)
+        await ctx.send(f"🔊 Ses kanalı güncellendi, **{kanal.name}** kanalına geçtim!")
+    else:
+        await kanal.connect()
+        await ctx.send(f"🎧 **{kanal.name}** kanalına giriş yapıldı, 7/24 nöbet aktif kanka!")
+
 @bot.command()
 async def selam(ctx):
     await ctx.send(f"Aleykümselam {ctx.author.mention}! 🚀")
