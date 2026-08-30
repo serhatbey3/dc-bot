@@ -44,4 +44,26 @@ async def id(ctx, user_id: int):
     except Exception as e:
         await ctx.send(f"❌ Böyle bir kullanıcı bulunamadı veya ID yanlış girildi! Hata: `{e}`")
 
+@bot.command()
+async def sil(ctx, miktar: int):
+    # Komutu yazan kişinin yetkisi var mı kontrol edelim (isteğe bağlı ama güvenlidir)
+    if not ctx.author.guild_permissions.manage_messages:
+        await ctx.send("❌ Bu komutu kullanmak için **Mesajları Yönet** yetkin olmalı kanka!")
+        return
+
+    if miktar <= 0:
+        await ctx.send("⚠️ Lütfen 0'dan büyük bir sayı gir kanka!")
+        return
+
+    try:
+        # Komutun kendi yazdığı mesajı da hesaba katıp siliyoruz
+        silinen = await ctx.channel.purge(limit=miktar + 1)
+        
+        # Bilgilendirme mesajı atıp 3 saniye sonra otomatik silelim ki ortalık kirlenmesin
+        bilgi = await ctx.send(f"🧹 Başarıyla **{len(silinen) - 1}** adet mesaj silindi kanka!")
+        await bilgi.delete(delay=3)
+        
+    except Exception as e:
+        await ctx.send(f"❌ Mesajlar silinirken bir hata oluştu (14 günden eski mesajlar toplu silinemez): `{e}`")
+
 bot.run(os.getenv("DISCORD_TOKEN"))
