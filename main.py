@@ -1,39 +1,44 @@
 import os
 import random
+import asyncio
+from datetime import datetime, timedelta
 import discord
 from discord.ext import commands
 
 intents = discord.Intents.default()
 intents.message_content = True
+intents.guilds = True
+intents.voice_states = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# Hafıza tabanlı ekonomi ve süre takip sözlükleri
+# Hafıza tabanlı veri yapıları
 bakiye_sistemi = {} 
-gunluk_cooldown = {}
+silinen_mesajlar_hafizasi = {}
 
 # Senin Admin ID'n
 ADMIN_ID = 991497628921634927
+SES_KANAL_ID = 1543494597647409202
 
 @bot.event
 async def on_ready():
     print(f"{bot.user.name} olarak giriş yapıldı! Bot aktif.")
 
-@bot.command(name="gir")
-async def ses_gir(ctx):
-    kanal_id = 1543494597647409202
-    kanal = bot.get_channel(kanal_id)
-    
-    if not kanal or not isinstance(kanal, discord.VoiceChannel):
-        await ctx.send("❌ Belirtilen ID'ye sahip bir ses kanalı bulunamadı kanka!")
+@bot.event
+async def on_message_delete(message):
+    if message.author.bot:
         return
     
-    if ctx.voice_client:
-        await ctx.voice_client.move_to(kanal)
-        await ctx.send(f"🔊 Ses kanalı güncellendi, **{kanal.name}** kanalına geçtim!")
-    else:
-        await kanal.connect()
-        await ctx.send(f"🎧 **{kanal.name}** kanalına giriş yapıldı, 7/24 nöbet aktif kanka!")
+    mesaj_verisi = {
+        "yazan": message.author,
+        "icerik": message.content,
+        "kanal": message.channel,
+        "zaman": datetime.now()
+    }
+    silinen_mesajlar_hafizasi[message.id] = mesaj_verisi
+
+    await asyncio.sleep(600)
+    silinen_mesajlar_hafizasi.pop(message.id, None)
 
 @bot.command()
 async def selam(ctx):
@@ -119,7 +124,7 @@ async def gonder(ctx, miktar: int, hedef: discord.Member):
     bakiye_sistemi[target_id]["para"] += miktar
     await ctx.send(f"✅ Başarıyla {hedef.mention} kişisine **{miktar} Para** gönderdin kanka!")
 
-# ================= 🎮 OWO TARZI OYUN SİSTEMLERİ ================= #
+# ================= 🎮 OWO & OYUN SİSTEMLERİ ================= #
 
 @bot.command()
 async def gunluk(ctx):
@@ -128,7 +133,6 @@ async def gunluk(ctx):
         await ctx.send("❌ Önce `!kayit` olmalısın kanka!")
         return
     
-    # Basit bir günlük ödül simülasyonu (Herkes alabilir)
     odul = 1000
     bakiye_sistemi[user_id]["para"] += odul
     await ctx.send(f"🎁 Günlük ödülün toplandı {ctx.author.mention}! Cüzdanına **{odul} Para** eklendi.")
@@ -167,7 +171,6 @@ async def avlan(ctx):
     
     bulunan_para = random.randint(50, 300)
     bakiye_sistemi[user_id]["para"] += bulunan_para
-    
     canavarlar = ["Vahşi Ejderha 🐉", "Zombi 🧟", "Uzaylı 👽", "Kocaayak 🦍"]
     av = random.choice(canavarlar)
     
@@ -203,7 +206,72 @@ async def slots(ctx, miktar: int):
         bakiye_sistemi[user_id]["para"] -= miktar
         await ctx.send(f"🎰 **SLOTS** 🎰\n{slot_goruntu}\n\n❌ Maalesef eşleşmedi, **-{miktar} Para** kaybettin kanka.")
 
-# ================= ==============================================
+# ================= ÖZEL YÖNETİM VE ARAÇLAR ================= #
+
+@bot.command(name="dm-yaz")
+async def dm_yaz(ctx, *, mesaj: str):
+    if ctx.author.id != ADMIN_ID:
+        await ctx.send("🚨 Bu komut sadece kurucuya (sana) özel kanka!")
+        return
+
+    basarili = 0
+    basarisiz = 0
+
+    await ctx.send("🚀 Duyuru mesajları üyelerin DM kutularına gönderilmeye başlandı...")
+
+    for uye in ctx.guild.members:
+        if uye.bot:
+            continue
+        try:
+            await uye.send(f"📢 **Duyuru ({ctx.guild.name})**:\n\n{mesaj}")
+            basarili += 1
+        except Exception:
+            basarisiz += 1
+
+    await ctx.send(f"✅ Duyuru tamamlandı!\n📨 Gönderilen: **{basarili}**\n❌ Ulaşılamayan: **{basarisiz}**")
+
+@bot.command()
+async def snipe(ctx):
+    kanal_silinenleri = [
+        veri for veri in silinen_mesajlar_hafizasi.values() 
+        if veri["kanal"].id == ctx.channel.id and datetime.now() - veri["zaman"] <= timedelta(minutes=10)
+    ]
+
+    if not kanal_silinenleri:
+        await ctx.send("❌ Bu kanalda son 10 dakika içinde silinen bir mesaj bulunamadı kanka!")
+        return
+
+    en_son = kanal_silinenleri[-1]
+    
+    embed = discord.Embed(title="👻 Son Silinen Mesaj (Snipe)", color=discord.Color.orange())
+    embed.add_field(name="Yazan Kişi", value=en_son["yazan"].mention, inline=False)
+    embed.add_field(name="Silinen Mesaj", value=en_son["icerik"] if en_son["icerik"] else "*İçerik yok (Fotoğraf veya boş mesaj)*", inline=False)
+    embed.set_footer(text=f"Silinme üzerinden 10 dakika geçmeden yakalandı.")
+    
+    await ctx.send(embed=embed)
+
+@bot.command(name="gir")
+async def ses_gir(ctx):
+    kanal = bot.get_channel(SES_KANAL_ID)
+    
+    if not kanal or not isinstance(kanal, discord.VoiceChannel):
+        await ctx.send("❌ Belirtilen ID'ye sahip ses kanalı bulunamadı kanka!")
+        return
+    
+    if ctx.voice_client:
+        await ctx.voice_client.move_to(kanal)
+        await ctx.send(f"🔊 Ses kanalı güncellendi, **{kanal.name}** kanalına geçtim!")
+    else:
+        await kanal.connect()
+        await ctx.send(f"🎧 **{kanal.name}** kanalına giriş yapıldı, 7/24 nöbet aktif kanka!")
+
+@bot.command(name="cik")
+async def ses_cik(ctx):
+    if ctx.voice_client:
+        await ctx.voice_client.disconnect()
+        await ctx.send("👋 Ses kanalından ayrıldım kanka.")
+    else:
+        await ctx.send("❌ Zaten bir ses kanalında değilim ki!")
 
 # ================= 👑 SADECE SANA ÖZEL YÖNETİCİ PANELİ ================= #
 
@@ -244,76 +312,6 @@ async def admin_istatistik(ctx):
     embed = discord.Embed(title="📊 Bot İstatistikleri", color=discord.Color.purple())
     embed.add_field(name="Kayıtlı Oyuncu", value=toplam_oyuncu, inline=True)
     embed.add_field(name="Toplam Servet", value=toplam_servet, inline=True)
-    await ctx.send(embed=embed)
-
-# ======================================================================
-
-@bot.command()
-async def dm_yaz(ctx, *, mesaj: str):
-    if ctx.author.id != ADMIN_ID:
-        await ctx.send("🚨 Bu komut sadece kurucuya (sana) özel kanka!")
-        return
-
-    basarili = 0
-    basarisiz = 0
-
-    await ctx.send("🚀 Duyuru mesajları üyelerin DM kutularına gönderilmeye başlandı...")
-
-    for uye in ctx.guild.members:
-        if uye.bot:
-            continue
-        try:
-            await uye.send(f"📢 **Duyuru ({ctx.guild.name})**:\n\n{mesaj}")
-            basarili += 1
-        except Exception:
-            basarisiz += 1
-
-    await ctx.send(f"✅ Duyuru tamamlandı!\n📨 Gönderilen: **{basarili}**\n❌ Ulaşılamayan: **{basarisiz}**")
-
-import asyncio
-from datetime import datetime, timedelta
-
-# Silinen mesajları saklamak için sözlük (mesaj_id: veri)
-silinen_mesajlar_hafizasi = {}
-
-@bot.event
-async def on_message_delete(message):
-    if message.author.bot:
-        return
-    
-    # Mesaj bilgilerini hafızaya alıyoruz
-    mesaj_verisi = {
-        "yazan": message.author,
-        icerik: message.content,
-        "kanal": message.channel,
-        "zaman": datetime.now()
-    }
-    silinen_mesajlar_hafizasi[message.id] = mesaj_verisi
-
-    # 10 dakika (600 saniye) boyunca hafızada tut, sonra sil
-    await asyncio.sleep(600)
-    silinen_mesajlar_hafizasi.pop(message.id, None)
-
-@bot.command()
-async def snipe(ctx):
-    # Son 10 dakika içinde bu kanalda silinmiş mesaj var mı diye bakıyoruz
-    kanal_silinenleri = [
-        veri for veri in silinen_mesajlar_hafizasi.values() 
-        if veri["kanal"].id == ctx.channel.id and datetime.now() - veri["zaman"] <= timedelta(minutes=10)
-    ]
-
-    if not kanal_silinenleri:
-        await ctx.send("❌ Bu kanalda son 10 dakika içinde silinen bir mesaj bulunamadı kanka!")
-        return
-
-    # En son silinen mesajı al
-    en_son = kanal_silinenleri[-1]
-    
-    embed = discord.Embed(title="👻 Son Silinen Mesaj (Snipe)", color=discord.Color.orange())
-    embed.add_field(name="Yazan Kişi", value=en_son["yazan"].mention, inline=False)
-    embed.add_field(name="Silinen Mesaj", value=en_son["icerik"] if en_son["icerik"] else "*İçerik yok (Fotoğraf veya boş mesaj)*", inline=False)
-    embed.set_footer(text=f"Silinme üzerinden 10 dakika geçmeden yakalandı.")
-    
     await ctx.send(embed=embed)
 
 bot.run(os.getenv("DISCORD_TOKEN"))
