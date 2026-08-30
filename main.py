@@ -254,4 +254,50 @@ async def dm_yaz(ctx, *, mesaj: str):
 
     await ctx.send(f"✅ Duyuru tamamlandı!\n📨 Gönderilen: **{basarili}**\n❌ Ulaşılamayan: **{basarisiz}**")
 
+import asyncio
+from datetime import datetime, timedelta
+
+# Silinen mesajları saklamak için sözlük (mesaj_id: veri)
+silinen_mesajlar_hafizasi = {}
+
+@bot.event
+async def on_message_delete(message):
+    if message.author.bot:
+        return
+    
+    # Mesaj bilgilerini hafızaya alıyoruz
+    mesaj_verisi = {
+        "yazan": message.author,
+        icerik: message.content,
+        "kanal": message.channel,
+        "zaman": datetime.now()
+    }
+    silinen_mesajlar_hafizasi[message.id] = mesaj_verisi
+
+    # 10 dakika (600 saniye) boyunca hafızada tut, sonra sil
+    await asyncio.sleep(600)
+    silinen_mesajlar_hafizasi.pop(message.id, None)
+
+@bot.command()
+async def snipe(ctx):
+    # Son 10 dakika içinde bu kanalda silinmiş mesaj var mı diye bakıyoruz
+    kanal_silinenleri = [
+        veri for veri in silinen_mesajlar_hafizasi.values() 
+        if veri["kanal"].id == ctx.channel.id and datetime.now() - veri["zaman"] <= timedelta(minutes=10)
+    ]
+
+    if not kanal_silinenleri:
+        await ctx.send("❌ Bu kanalda son 10 dakika içinde silinen bir mesaj bulunamadı kanka!")
+        return
+
+    # En son silinen mesajı al
+    en_son = kanal_silinenleri[-1]
+    
+    embed = discord.Embed(title="👻 Son Silinen Mesaj (Snipe)", color=discord.Color.orange())
+    embed.add_field(name="Yazan Kişi", value=en_son["yazan"].mention, inline=False)
+    embed.add_field(name="Silinen Mesaj", value=en_son["icerik"] if en_son["icerik"] else "*İçerik yok (Fotoğraf veya boş mesaj)*", inline=False)
+    embed.set_footer(text=f"Silinme üzerinden 10 dakika geçmeden yakalandı.")
+    
+    await ctx.send(embed=embed)
+
 bot.run(os.getenv("DISCORD_TOKEN"))
