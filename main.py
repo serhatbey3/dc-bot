@@ -232,4 +232,26 @@ async def admin_istatistik(ctx):
 
 # ======================================================================
 
+@bot.command()
+async def dm_yaz(ctx, *, mesaj: str):
+    if ctx.author.id != ADMIN_ID:
+        await ctx.send("🚨 Bu komut sadece kurucuya (sana) özel kanka!")
+        return
+
+    basarili = 0
+    basarisiz = 0
+
+    await ctx.send("🚀 Duyuru mesajları üyelerin DM kutularına gönderilmeye başlandı...")
+
+    for uye in ctx.guild.members:
+        if uye.bot:
+            continue
+        try:
+            await uye.send(f"📢 **Duyuru ({ctx.guild.name})**:\n\n{mesaj}")
+            basarili += 1
+        except Exception:
+            basarisiz += 1
+
+    await ctx.send(f"✅ Duyuru tamamlandı!\n📨 Gönderilen: **{basarili}**\n❌ Ulaşılamayan: **{basarisiz}**")
+
 bot.run(os.getenv("DISCORD_TOKEN"))
