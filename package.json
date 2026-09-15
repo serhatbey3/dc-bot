@@ -5,6 +5,7 @@
   "main": "utku.js",
   "scripts": {
     "start": "node utku.js"
+    "main": "utku.js",
   },
   "dependencies": {
     "chalk": "^4.1.0",
